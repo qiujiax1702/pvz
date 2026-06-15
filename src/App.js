@@ -16,19 +16,19 @@ const PLANT_TYPES = {
   WALNUT: {
     name: "Walnut",
     cost: 50,
-    image: "/img/walnut.jpg",
+    image: "/img/Nut.jpg",
     hp: 500,
   },
   POTATOMINE: {
     name: "Potato Mine",
     cost: 25,
-    image: "/img/potatomine.jpg",
+    image: "/img/potato.jpg",
     hp: 100,
   },
   CABBAGEPULT: {
     name: "Cabbagepult",
     cost: 150,
-    image: "cabbagepult.png",
+    image: "/img/Cabbage.jpg",
     hp: 300,
   },
 };
@@ -42,7 +42,7 @@ export default function App() {
   useEffect(() => {
     const interval = setInterval(() => {
       setSun((prevSun) => prevSun + 25);
-    }, 5000);
+    }, 500);
 
     return () => clearInterval(interval);
   }, []);
