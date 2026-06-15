@@ -5,7 +5,7 @@ const PLANT_TYPES = {
     name: "Sunflower",
     cost: 50,
     image: "/img/sunflower.jpg",
-    abilitycooldown: 5,
+    abilitycooldown: 10,
     hp: 300,
   },
   PEASHOOTER: {
@@ -107,35 +107,35 @@ const ZOMBIE_TYPES = {
     hp: 200,
     speed: 0.2,
     image: "/img/zombie.png",
-    damage: 20,
+    damage: 5,
   },
   CONEHEAD: {
     name: "Conehead Zombie",
     hp: 400,
     speed: 0.2,
     image: "/img/zombo.jpg",
-    damage: 20,
+    damage: 5,
   },
   BUCKETHEAD: {
     name: "Buckethead Zombie",
     hp: 600,
     speed: 0.2,
     image: "/img/bucket.jpg",
-    damage: 20,
+    damage: 5,
   },
   QUARTERBACK: {
     name: "Quarterback Zombie",
     hp: 800,
     speed: 0.3,
     image: "/img/quarterback.png",
-    damage: 20,
+    damage: 6,
   },
   JOURNALIST: {
     name: "Journalist Zombie",
     hp: 800,
     speed: 0.25,
     image: "/img/newspaper.png",
-    damage: 20,
+    damage: 7,
   },
 };
 
@@ -145,7 +145,9 @@ export default function App() {
   const [grid, setGrid] = useState(Array(45).fill(null));
   const [zombies, setZombies] = useState([]);
   const [hoveredCell, setHoveredCell] = useState(null);
+  const [droppedSuns, setDroppedSuns] = useState([]);
 
+  // Sole passivo dal cielo
   useEffect(() => {
     const interval = setInterval(() => {
       setSun((prevSun) => prevSun + 25);
@@ -153,6 +155,7 @@ export default function App() {
     return () => clearInterval(interval);
   }, []);
 
+  // Spawn dei zombie
   useEffect(() => {
     const spawnInterval = setInterval(() => {
       const randomLane = Math.floor(Math.random() * 5);
@@ -177,23 +180,92 @@ export default function App() {
     return () => clearInterval(spawnInterval);
   }, []);
 
+  // Game Loop principale
   useEffect(() => {
     const gameLoop = setInterval(() => {
-      setZombies((prevZombies) => {
-        return prevZombies
-          .map((zombie) => {
-            return { ...zombie, x: zombie.x - zombie.speed };
-          })
-          .filter((zombie) => {
-            if (zombie.x <= 0) {
-              alert("I zombie hanno mangiato il tuo cervello! GAME OVER");
-              window.location.reload();
-              return false;
+      setGrid((prevGrid) => {
+        // Cloniamo l'array di base
+        const nextGrid = [...prevGrid];
+
+        // Gestione dei Girasoli
+        for (let i = 0; i < nextGrid.length; i++) {
+          if (nextGrid[i] && nextGrid[i].type === "SUNFLOWER") {
+            // Fix Mutazione: Clona l'oggetto pianta prima di modificarlo
+            const plant = { ...nextGrid[i] };
+            plant.cooldownTimer = (plant.cooldownTimer || 0) + 100;
+
+            const targetCooldown = PLANT_TYPES.SUNFLOWER.abilitycooldown * 1000;
+
+            if (plant.cooldownTimer >= targetCooldown) {
+              const lane = Math.floor(i / 9);
+              const col = i % 9;
+
+              // Calcolo corretto considerando: padding board (15px) + dimensione cella (80px) + gap (5px)
+              const cellTop = 15 + lane * (80 + 5);
+              const cellLeft = 15 + col * (80 + 5);
+
+              const newSun = {
+                id: Date.now() + Math.random(),
+                // Centriamo il sole nella cella (80px / 2 = 40)
+                top: cellTop + 40,
+                left: cellLeft + 40,
+              };
+
+              setDroppedSuns((prevSuns) => [...prevSuns, newSun]);
+              plant.cooldownTimer = 0;
             }
-            return true;
-          });
+            nextGrid[i] = plant;
+          }
+        }
+
+        // Movimento ed attacco Zombie
+        setZombies((prevZombies) => {
+          return prevZombies
+            .map((zombie) => {
+              let zombieEating = false;
+
+              for (let col = 0; col < 9; col++) {
+                const cellIndex = zombie.lane * 9 + col;
+                const plant = nextGrid[cellIndex];
+
+                if (plant) {
+                  const cellLeftEdge = (col * 100) / 9;
+                  const cellRightEdge = ((col + 1) * 100) / 9;
+
+                  if (zombie.x >= cellLeftEdge && zombie.x <= cellRightEdge) {
+                    zombieEating = true;
+                    const damagePerTick = zombie.damage / 10;
+
+                    // Fix Mutazione: Clona la pianta colpita
+                    const damagedPlant = { ...plant };
+                    if (damagedPlant.hp - damagePerTick <= 0) {
+                      nextGrid[cellIndex] = null;
+                    } else {
+                      damagedPlant.hp -= damagePerTick;
+                      nextGrid[cellIndex] = damagedPlant;
+                    }
+                    break;
+                  }
+                }
+              }
+
+              const nextX = zombieEating ? zombie.x : zombie.x - zombie.speed;
+              return { ...zombie, x: nextX };
+            })
+            .filter((zombie) => {
+              if (zombie.x <= 0) {
+                alert("I zombie hanno mangiato il tuo cervello! GAME OVER");
+                window.location.reload();
+                return false;
+              }
+              return true;
+            });
+        });
+
+        return nextGrid;
       });
     }, 100);
+
     return () => clearInterval(gameLoop);
   }, []);
 
@@ -217,6 +289,8 @@ export default function App() {
         type: selectedPlant,
         image: plantData.image,
         hp: plantData.hp,
+        maxHp: plantData.hp,
+        cooldownTimer: 0,
       };
 
       setGrid(newGrid);
@@ -226,8 +300,24 @@ export default function App() {
     }
   };
 
+  const handleCollectSun = (id, e) => {
+    e.stopPropagation(); // Previene il click sulla cella sottostante
+    setSun((prev) => prev + 25);
+    setDroppedSuns((prevSuns) => prevSuns.filter((s) => s.id !== id));
+  };
+
   return (
     <div style={styles.container}>
+      {/* Iniezione dei Keyframes CSS per far pulsare i soli */}
+      <style>
+        {`
+          @keyframes sunPulse {
+            0% { transform: translate(-50%, -50%) scale(1); }
+            100% { transform: translate(-50%, -50%) scale(1.2); }
+          }
+        `}
+      </style>
+
       <h1 style={styles.title}>Plants vs Zombies</h1>
 
       <div style={styles.topBar}>
@@ -293,17 +383,42 @@ export default function App() {
               style={{
                 ...styles.cell,
                 backgroundColor: hoveredCell === index ? "#66bb6a" : "#4caf50",
+                position: "relative",
               }}
             >
               {cell ? (
-                <img
-                  src={cell.image}
-                  alt={cell.type}
-                  style={styles.plantImage}
-                  onError={(e) => {
-                    e.target.style.visibility = "hidden";
+                <div
+                  style={{
+                    display: "flex",
+                    flexDirection: "column",
+                    alignItems: "center",
                   }}
-                />
+                >
+                  <div
+                    style={{
+                      width: "40px",
+                      height: "4px",
+                      backgroundColor: "#000",
+                      marginBottom: "2px",
+                    }}
+                  >
+                    <div
+                      style={{
+                        height: "100%",
+                        backgroundColor: "#00ff00",
+                        width: `${(cell.hp / cell.maxHp) * 100}%`,
+                      }}
+                    />
+                  </div>
+                  <img
+                    src={cell.image}
+                    alt={cell.type}
+                    style={styles.plantImage}
+                    onError={(e) => {
+                      e.target.style.visibility = "hidden";
+                    }}
+                  />
+                </div>
               ) : (
                 selectedPlant &&
                 hoveredCell === index && (
@@ -313,6 +428,21 @@ export default function App() {
             </div>
           ))}
         </div>
+
+        {/* Render dei soli */}
+        {droppedSuns.map((sunItem) => (
+          <div
+            key={sunItem.id}
+            onClick={(e) => handleCollectSun(sunItem.id, e)}
+            style={{
+              ...styles.droppedSun,
+              top: `${sunItem.top}px`,
+              left: `${sunItem.left}px`,
+            }}
+          >
+            ☀️
+          </div>
+        ))}
 
         {zombies.map((zombie) => (
           <div
@@ -373,10 +503,7 @@ const styles = {
     flexDirection: "column",
     alignItems: "center",
   },
-  title: {
-    marginBottom: "20px",
-    color: "#81c784",
-  },
+  title: { marginBottom: "20px", color: "#81c784" },
   topBar: {
     display: "flex",
     flexDirection: "row",
@@ -426,11 +553,7 @@ const styles = {
     alignItems: "center",
     justifyContent: "center",
   },
-  seedImage: {
-    maxHeight: "40px",
-    maxWidth: "70px",
-    objectFit: "contain",
-  },
+  seedImage: { maxHeight: "40px", maxWidth: "70px", objectFit: "contain" },
   btnTextContainer: {
     display: "flex",
     flexDirection: "column",
@@ -449,11 +572,7 @@ const styles = {
     textOverflow: "ellipsis",
     width: "100%",
   },
-  costText: {
-    fontSize: "12px",
-    fontWeight: "bold",
-    color: "#2e7d32",
-  },
+  costText: { fontSize: "12px", fontWeight: "bold", color: "#2e7d32" },
   cancelButton: {
     padding: "10px 15px",
     backgroundColor: "#d32f2f",
@@ -463,10 +582,7 @@ const styles = {
     cursor: "pointer",
     fontWeight: "bold",
   },
-  gameArea: {
-    position: "relative",
-    width: "fit-content",
-  },
+  gameArea: { position: "relative", width: "fit-content" },
   board: {
     display: "grid",
     gridTemplateColumns: "repeat(9, 80px)",
@@ -487,11 +603,7 @@ const styles = {
     border: "1px solid #388e3c",
     borderRadius: "4px",
   },
-  plantImage: {
-    maxWidth: "90%",
-    maxHeight: "90%",
-    objectFit: "contain",
-  },
+  plantImage: { maxWidth: "90%", maxHeight: "90%", objectFit: "contain" },
   zombieHpBarBg: {
     width: "45px",
     height: "6px",
@@ -505,9 +617,15 @@ const styles = {
     backgroundColor: "#2e7d32",
     transition: "width 0.2s",
   },
-  zombieImage: {
-    width: "85px",
-    height: "120px",
-    objectFit: "contain",
+  zombieImage: { width: "85px", height: "120px", objectFit: "contain" },
+
+  droppedSun: {
+    position: "absolute",
+    fontSize: "36px",
+    cursor: "pointer",
+    zIndex: 20,
+    animation: "sunPulse 1s infinite alternate ease-in-out",
+    userSelect: "none",
+    filter: "drop-shadow(0px 0px 8px #ffd54f)",
   },
 };
