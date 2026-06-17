@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 
 const INITIAL_PLANT_TYPES = {
   SUNFLOWER: {
@@ -112,42 +112,42 @@ const INITIAL_PLANT_TYPES = {
 const ZOMBIE_TYPES = {
   REGULAR: {
     name: "Regular Zombie",
-    hp: 200,
+    hp: 600,
     speed: 0.15,
     image: "/img/zombie.png",
     damage: 8,
   },
   CONEHEAD: {
     name: "Conehead Zombie",
-    hp: 400,
+    hp: 900,
     speed: 0.15,
     image: "/img/zombo.jpg",
     damage: 8,
   },
   BUCKETHEAD: {
     name: "Buckethead Zombie",
-    hp: 600,
+    hp: 1200,
     speed: 0.15,
     image: "/img/bucket.jpg",
     damage: 8,
   },
   QUARTERBACK: {
     name: "Quarterback Zombie",
-    hp: 800,
+    hp: 1500,
     speed: 0.2,
     image: "/img/quarterback.png",
     damage: 9,
   },
   JOURNALIST: {
     name: "Journalist Zombie",
-    hp: 800,
+    hp: 1800,
     speed: 0.15,
     image: "/img/newspaper.png",
     damage: 9,
   },
   YETI: {
     name: "Yeti",
-    hp: 1500,
+    hp: 7000,
     speed: 0.05,
     image: "/img/yeti.jpg",
     damage: 30,
@@ -159,12 +159,24 @@ export default function App() {
   const [selectedPlant, setSelectedPlant] = useState(null);
   const [grid, setGrid] = useState(Array(45).fill(null));
   const [zombies, setZombies] = useState([]);
-  const [projectiles, setProjectiles] = useState([]); // Stato per i proiettili
+  const [projectiles, setProjectiles] = useState([]);
   const [hoveredCell, setHoveredCell] = useState(null);
   const [droppedSuns, setDroppedSuns] = useState([]);
 
   const [plantTypes, setPlantTypes] = useState(INITIAL_PLANT_TYPES);
   const [vsClicks, setVsClicks] = useState(0);
+
+  // Utilizziamo i Ref per evitare di riavviare i timer ad ogni aggiornamento di stato
+  const plantTypesRef = useRef(plantTypes);
+  const zombiesRef = useRef(zombies);
+
+  useEffect(() => {
+    plantTypesRef.current = plantTypes;
+  }, [plantTypes]);
+
+  useEffect(() => {
+    zombiesRef.current = zombies;
+  }, [zombies]);
 
   // Sole passivo dal cielo
   useEffect(() => {
@@ -204,8 +216,10 @@ export default function App() {
     const gameLoop = setInterval(() => {
       setGrid((prevGrid) => {
         const nextGrid = [...prevGrid];
+        const currentPlantTypes = plantTypesRef.current;
+        const currentZombies = zombiesRef.current;
 
-        // Gestione abilità delle Piante (Girasoli e Peashooter)
+        // Gestione abilità delle Piante
         for (let i = 0; i < nextGrid.length; i++) {
           if (!nextGrid[i]) continue;
 
@@ -213,14 +227,14 @@ export default function App() {
           const lane = Math.floor(i / 9);
           const col = i % 9;
 
-          // Calcolo coordinate cella per posizionamento grafico
           const cellTop = 15 + lane * (80 + 5);
           const cellLeft = 15 + col * (80 + 5);
 
           // 1. Girasole
           if (plant.type === "SUNFLOWER") {
             plant.cooldownTimer = (plant.cooldownTimer || 0) + 100;
-            const targetCooldown = plantTypes.SUNFLOWER.abilitycooldown * 1000;
+            const targetCooldown =
+              currentPlantTypes.SUNFLOWER.abilitycooldown * 1000;
 
             if (plant.cooldownTimer >= targetCooldown) {
               const newSun = {
@@ -234,15 +248,15 @@ export default function App() {
             nextGrid[i] = plant;
           }
 
-          // 2. Peashooter (Spara solo se ci sono zombie nella stessa corsia, davanti alla pianta)
+          // 2. Peashooter
           if (plant.type === "PEASHOOTER") {
             plant.cooldownTimer = (plant.cooldownTimer || 0) + 100;
-            const targetCooldown = plantTypes.PEASHOOTER.abilitycooldown * 1000;
+            const targetCooldown =
+              currentPlantTypes.PEASHOOTER.abilitycooldown * 1000;
 
             if (plant.cooldownTimer >= targetCooldown) {
-              // Posizione percentuale della pianta lungo la corsia (stessa scala usata per gli zombie e i proiettili)
               const plantXPercent = ((col + 0.5) / 9) * 100;
-              const zombieInLane = zombies.some(
+              const zombieInLane = currentZombies.some(
                 (z) => z.lane === lane && z.x > plantXPercent && z.hp > 0,
               );
 
@@ -250,9 +264,8 @@ export default function App() {
                 const newProjectile = {
                   id: `proj-${Date.now()}-${Math.random()}`,
                   lane: lane,
-                  // Stessa scala percentuale usata da zombie.x: 0 = bordo sinistro, 100 = bordo destro della board
                   x: ((col + 0.8) / 9) * 100,
-                  damage: plantTypes.PEASHOOTER.damage,
+                  damage: currentPlantTypes.PEASHOOTER.damage,
                 };
                 setProjectiles((prev) => [...prev, newProjectile]);
                 plant.cooldownTimer = 0;
@@ -317,85 +330,51 @@ export default function App() {
     }, 100);
 
     return () => clearInterval(gameLoop);
-  }, [plantTypes, zombies]);
+  }, []);
 
-  // Loop separato ad alta frequenza per il movimento dei proiettili e le collisioni.
-  // Logica riscritta per evitare l'aggiornamento annidato setZombies-dentro-setProjectiles:
-  // ora leggiamo zombies e projectiles come "snapshot" coerenti dello stesso tick,
-  // calcoliamo TUTTE le collisioni in un unico passaggio puro, e poi applichiamo
-  // un solo setProjectiles e un solo setZombies. Questo elimina la race condition
-  // della variabile `hit` catturata per chiusura e i danni doppi/mancati.
+  // Loop Proiettili CORRETTO: Rilevamento collisione frontale garantito
   useEffect(() => {
     const projectileLoop = setInterval(() => {
       setProjectiles((prevProjectiles) => {
         if (prevProjectiles.length === 0) return prevProjectiles;
 
-        // Mappa danno-da-applicare per id zombie, accumulata in questo tick
-        const damageByZombieId = new Map();
         const survivingProjectiles = [];
+        const damageMap = {};
+        const currentZombies = zombiesRef.current;
 
-        setZombies((currentZombies) => {
-          // Indicizziamo gli zombie vivi per corsia, ordinati dal più vicino (x minore) al più lontano,
-          // così un proiettile colpisce sempre il primo zombie utile che incontra sul suo cammino.
-          const zombiesByLane = new Map();
-          for (const z of currentZombies) {
-            if (z.hp <= 0) continue;
-            if (!zombiesByLane.has(z.lane)) zombiesByLane.set(z.lane, []);
-            zombiesByLane.get(z.lane).push(z);
+        const PROJECTILE_SPEED = 1.5;
+
+        for (const proj of prevProjectiles) {
+          const nextX = proj.x + PROJECTILE_SPEED;
+
+          // Trova lo zombie vivo più a sinistra nella stessa corsia che è stato raggiunto o superato dal proiettile
+          const hitZombie = currentZombies.find(
+            (z) => z.lane === proj.lane && z.hp > 0 && nextX >= z.x, // Il proiettile ha impattato o superato lo zombie
+          );
+
+          if (hitZombie) {
+            // Il proiettile si ferma qui (non viene aggiunto a survivingProjectiles)
+            // Registra il danno per questo zombie
+            damageMap[hitZombie.id] =
+              (damageMap[hitZombie.id] || 0) + proj.damage;
+          } else if (nextX < 105) {
+            // Se non ha colpito nessuno e non è uscito dallo schermo, continua a volare
+            survivingProjectiles.push({ ...proj, x: nextX });
           }
-          for (const list of zombiesByLane.values()) {
-            list.sort((a, b) => a.x - b.x);
-          }
+        }
 
-          // Teniamo traccia di quanto danno "già pianificato" ha ogni zombie in questo tick,
-          // così se un proiettile lo considera già abbattuto (hp pianificato <= 0) lo saltiamo
-          // e passiamo al prossimo target nella stessa corsia.
-          const plannedDamage = new Map();
-
-          const PROJECTILE_SPEED = 1.5; // stessa velocità percentuale di prima
-          const HIT_RADIUS = 3; // percentuale: distanza entro cui consideriamo "colpito"
-
-          for (const proj of prevProjectiles) {
-            const newX = proj.x + PROJECTILE_SPEED;
-            const candidates = zombiesByLane.get(proj.lane) || [];
-
-            let hitZombie = null;
-            for (const z of candidates) {
-              const alreadyPlanned = plannedDamage.get(z.id) || 0;
-              const effectiveHp = z.hp - alreadyPlanned;
-              if (effectiveHp <= 0) continue; // questo zombie morirà già per altri colpi pianificati
-
-              // Il proiettile colpisce se ha raggiunto o superato la posizione dello zombie
-              if (newX >= z.x - HIT_RADIUS) {
-                hitZombie = z;
-                break;
-              }
-            }
-
-            if (hitZombie) {
-              const prevDamage = damageByZombieId.get(hitZombie.id) || 0;
-              damageByZombieId.set(hitZombie.id, prevDamage + proj.damage);
-              plannedDamage.set(
-                hitZombie.id,
-                (plannedDamage.get(hitZombie.id) || 0) + proj.damage,
-              );
-              // proiettile consumato, non sopravvive al tick
-            } else if (newX < 105) {
-              survivingProjectiles.push({ ...proj, x: newX });
-            }
-            // se newX >= 105 e non ha colpito nulla, il proiettile esce semplicemente di scena
-          }
-
-          if (damageByZombieId.size === 0) {
-            return currentZombies; // nessuna modifica, evitiamo un re-render inutile
-          }
-
-          return currentZombies.map((z) => {
-            const dmg = damageByZombieId.get(z.id);
-            if (!dmg) return z;
-            return { ...z, hp: z.hp - dmg };
-          });
-        });
+        // Se ci sono stati impatti, aggiorna la vita degli zombie colpiti
+        if (Object.keys(damageMap).length > 0) {
+          setZombies((prevZombies) =>
+            prevZombies
+              .map((z) =>
+                damageMap[z.id]
+                  ? { ...z, hp: Math.max(0, z.hp - damageMap[z.id]) }
+                  : z,
+              )
+              .filter((z) => z.hp > 0),
+          );
+        }
 
         return survivingProjectiles;
       });
@@ -688,7 +667,6 @@ export default function App() {
           ))}
         </div>
 
-        {/* Render dei Soli */}
         {droppedSuns.map((sunItem) => (
           <div
             key={sunItem.id}
@@ -707,13 +685,12 @@ export default function App() {
           </div>
         ))}
 
-        {/* Render dei Proiettili (Peas) del Peashooter */}
         {projectiles.map((proj) => (
           <div
             key={proj.id}
             style={{
               position: "absolute",
-              top: `${proj.lane * 85 + 15 + 40}px`, // Centrato verticalmente nella corsia
+              top: `${proj.lane * 85 + 15 + 40}px`,
               left: `${proj.x}%`,
               width: "40px",
               height: "40px",
@@ -727,7 +704,6 @@ export default function App() {
               alt="Pea"
               style={{ width: "100%", height: "100%", objectFit: "contain" }}
               onError={(e) => {
-                // Se manca l'immagine viene renderizzata una sfera verde stilizzata CSS
                 e.target.style.display = "none";
                 if (!e.target.parentNode.querySelector(".pea-fallback")) {
                   const div = document.createElement("div");
@@ -792,7 +768,6 @@ export default function App() {
   );
 }
 
-// Gli stili (const styles = { ... }) rimangono invariati rispetto al tuo codice originale
 const styles = {
   container: {
     padding: "20px",
