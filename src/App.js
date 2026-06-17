@@ -1,19 +1,20 @@
 import React, { useState, useEffect } from "react";
 
-const PLANT_TYPES = {
+const INITIAL_PLANT_TYPES = {
   SUNFLOWER: {
     name: "Sunflower",
     cost: 50,
     image: "/img/sunflower.jpg",
-    abilitycooldown: 10,
-    hp: 300,
+    abilitycooldown: 7,
+    hp: 150,
   },
   PEASHOOTER: {
     name: "Peashooter",
     cost: 100,
     image: "/img/peashooter.jpg",
-    abilitycooldown: 1,
-    hp: 300,
+    abilitycooldown: 1.5,
+    hp: 200,
+    damage: 20,
   },
   WALNUT: {
     name: "Walnut",
@@ -99,43 +100,57 @@ const PLANT_TYPES = {
     abilitycooldown: 30,
     hp: 300,
   },
+  SNOWPEA: {
+    name: "Snowpea",
+    cost: 200,
+    image: "/img/snowpea.jpg",
+    abilitycooldown: 1.5,
+    hp: 200,
+  },
 };
 
 const ZOMBIE_TYPES = {
   REGULAR: {
     name: "Regular Zombie",
     hp: 200,
-    speed: 0.2,
+    speed: 0.15,
     image: "/img/zombie.png",
-    damage: 5,
+    damage: 8,
   },
   CONEHEAD: {
     name: "Conehead Zombie",
     hp: 400,
-    speed: 0.2,
+    speed: 0.15,
     image: "/img/zombo.jpg",
-    damage: 5,
+    damage: 8,
   },
   BUCKETHEAD: {
     name: "Buckethead Zombie",
     hp: 600,
-    speed: 0.2,
+    speed: 0.15,
     image: "/img/bucket.jpg",
-    damage: 5,
+    damage: 8,
   },
   QUARTERBACK: {
     name: "Quarterback Zombie",
     hp: 800,
-    speed: 0.3,
+    speed: 0.2,
     image: "/img/quarterback.png",
-    damage: 6,
+    damage: 9,
   },
   JOURNALIST: {
     name: "Journalist Zombie",
     hp: 800,
-    speed: 0.25,
+    speed: 0.15,
     image: "/img/newspaper.png",
-    damage: 7,
+    damage: 9,
+  },
+  YETI: {
+    name: "Yeti",
+    hp: 1500,
+    speed: 0.05,
+    image: "/img/yeti.jpg",
+    damage: 30,
   },
 };
 
@@ -144,8 +159,12 @@ export default function App() {
   const [selectedPlant, setSelectedPlant] = useState(null);
   const [grid, setGrid] = useState(Array(45).fill(null));
   const [zombies, setZombies] = useState([]);
+  const [projectiles, setProjectiles] = useState([]); // Stato per i proiettili
   const [hoveredCell, setHoveredCell] = useState(null);
   const [droppedSuns, setDroppedSuns] = useState([]);
+
+  const [plantTypes, setPlantTypes] = useState(INITIAL_PLANT_TYPES);
+  const [vsClicks, setVsClicks] = useState(0);
 
   // Sole passivo dal cielo
   useEffect(() => {
@@ -180,39 +199,64 @@ export default function App() {
     return () => clearInterval(spawnInterval);
   }, []);
 
-  // Game Loop principale
+  // Game Loop principale (Gestione piante, spari e zombie)
   useEffect(() => {
     const gameLoop = setInterval(() => {
       setGrid((prevGrid) => {
-        // Cloniamo l'array di base
         const nextGrid = [...prevGrid];
 
-        // Gestione dei Girasoli
+        // Gestione abilità delle Piante (Girasoli e Peashooter)
         for (let i = 0; i < nextGrid.length; i++) {
-          if (nextGrid[i] && nextGrid[i].type === "SUNFLOWER") {
-            // Fix Mutazione: Clona l'oggetto pianta prima di modificarlo
-            const plant = { ...nextGrid[i] };
-            plant.cooldownTimer = (plant.cooldownTimer || 0) + 100;
+          if (!nextGrid[i]) continue;
 
-            const targetCooldown = PLANT_TYPES.SUNFLOWER.abilitycooldown * 1000;
+          const plant = { ...nextGrid[i] };
+          const lane = Math.floor(i / 9);
+          const col = i % 9;
+
+          // Calcolo coordinate cella per posizionamento grafico
+          const cellTop = 15 + lane * (80 + 5);
+          const cellLeft = 15 + col * (80 + 5);
+
+          // 1. Girasole
+          if (plant.type === "SUNFLOWER") {
+            plant.cooldownTimer = (plant.cooldownTimer || 0) + 100;
+            const targetCooldown = plantTypes.SUNFLOWER.abilitycooldown * 1000;
 
             if (plant.cooldownTimer >= targetCooldown) {
-              const lane = Math.floor(i / 9);
-              const col = i % 9;
-
-              // Calcolo corretto considerando: padding board (15px) + dimensione cella (80px) + gap (5px)
-              const cellTop = 15 + lane * (80 + 5);
-              const cellLeft = 15 + col * (80 + 5);
-
               const newSun = {
                 id: Date.now() + Math.random(),
-                // Centriamo il sole nella cella (80px / 2 = 40)
                 top: cellTop + 40,
                 left: cellLeft + 40,
               };
-
               setDroppedSuns((prevSuns) => [...prevSuns, newSun]);
               plant.cooldownTimer = 0;
+            }
+            nextGrid[i] = plant;
+          }
+
+          // 2. Peashooter (Spara solo se ci sono zombie nella stessa corsia, davanti alla pianta)
+          if (plant.type === "PEASHOOTER") {
+            plant.cooldownTimer = (plant.cooldownTimer || 0) + 100;
+            const targetCooldown = plantTypes.PEASHOOTER.abilitycooldown * 1000;
+
+            if (plant.cooldownTimer >= targetCooldown) {
+              // Posizione percentuale della pianta lungo la corsia (stessa scala usata per gli zombie e i proiettili)
+              const plantXPercent = ((col + 0.5) / 9) * 100;
+              const zombieInLane = zombies.some(
+                (z) => z.lane === lane && z.x > plantXPercent && z.hp > 0,
+              );
+
+              if (zombieInLane) {
+                const newProjectile = {
+                  id: `proj-${Date.now()}-${Math.random()}`,
+                  lane: lane,
+                  // Stessa scala percentuale usata da zombie.x: 0 = bordo sinistro, 100 = bordo destro della board
+                  x: ((col + 0.8) / 9) * 100,
+                  damage: plantTypes.PEASHOOTER.damage,
+                };
+                setProjectiles((prev) => [...prev, newProjectile]);
+                plant.cooldownTimer = 0;
+              }
             }
             nextGrid[i] = plant;
           }
@@ -235,13 +279,19 @@ export default function App() {
                   if (zombie.x >= cellLeftEdge && zombie.x <= cellRightEdge) {
                     zombieEating = true;
                     const damagePerTick = zombie.damage / 10;
-
-                    // Fix Mutazione: Clona la pianta colpita
                     const damagedPlant = { ...plant };
+
                     if (damagedPlant.hp - damagePerTick <= 0) {
                       nextGrid[cellIndex] = null;
                     } else {
                       damagedPlant.hp -= damagePerTick;
+
+                      if (damagedPlant.type === "ACORN") {
+                        const expectedCount = Math.ceil(damagedPlant.hp / 50);
+                        if (expectedCount < damagedPlant.acornCount) {
+                          damagedPlant.acornCount = expectedCount;
+                        }
+                      }
                       nextGrid[cellIndex] = damagedPlant;
                     }
                     break;
@@ -258,7 +308,7 @@ export default function App() {
                 window.location.reload();
                 return false;
               }
-              return true;
+              return zombie.hp > 0;
             });
         });
 
@@ -267,6 +317,91 @@ export default function App() {
     }, 100);
 
     return () => clearInterval(gameLoop);
+  }, [plantTypes, zombies]);
+
+  // Loop separato ad alta frequenza per il movimento dei proiettili e le collisioni.
+  // Logica riscritta per evitare l'aggiornamento annidato setZombies-dentro-setProjectiles:
+  // ora leggiamo zombies e projectiles come "snapshot" coerenti dello stesso tick,
+  // calcoliamo TUTTE le collisioni in un unico passaggio puro, e poi applichiamo
+  // un solo setProjectiles e un solo setZombies. Questo elimina la race condition
+  // della variabile `hit` catturata per chiusura e i danni doppi/mancati.
+  useEffect(() => {
+    const projectileLoop = setInterval(() => {
+      setProjectiles((prevProjectiles) => {
+        if (prevProjectiles.length === 0) return prevProjectiles;
+
+        // Mappa danno-da-applicare per id zombie, accumulata in questo tick
+        const damageByZombieId = new Map();
+        const survivingProjectiles = [];
+
+        setZombies((currentZombies) => {
+          // Indicizziamo gli zombie vivi per corsia, ordinati dal più vicino (x minore) al più lontano,
+          // così un proiettile colpisce sempre il primo zombie utile che incontra sul suo cammino.
+          const zombiesByLane = new Map();
+          for (const z of currentZombies) {
+            if (z.hp <= 0) continue;
+            if (!zombiesByLane.has(z.lane)) zombiesByLane.set(z.lane, []);
+            zombiesByLane.get(z.lane).push(z);
+          }
+          for (const list of zombiesByLane.values()) {
+            list.sort((a, b) => a.x - b.x);
+          }
+
+          // Teniamo traccia di quanto danno "già pianificato" ha ogni zombie in questo tick,
+          // così se un proiettile lo considera già abbattuto (hp pianificato <= 0) lo saltiamo
+          // e passiamo al prossimo target nella stessa corsia.
+          const plannedDamage = new Map();
+
+          const PROJECTILE_SPEED = 1.5; // stessa velocità percentuale di prima
+          const HIT_RADIUS = 3; // percentuale: distanza entro cui consideriamo "colpito"
+
+          for (const proj of prevProjectiles) {
+            const newX = proj.x + PROJECTILE_SPEED;
+            const candidates = zombiesByLane.get(proj.lane) || [];
+
+            let hitZombie = null;
+            for (const z of candidates) {
+              const alreadyPlanned = plannedDamage.get(z.id) || 0;
+              const effectiveHp = z.hp - alreadyPlanned;
+              if (effectiveHp <= 0) continue; // questo zombie morirà già per altri colpi pianificati
+
+              // Il proiettile colpisce se ha raggiunto o superato la posizione dello zombie
+              if (newX >= z.x - HIT_RADIUS) {
+                hitZombie = z;
+                break;
+              }
+            }
+
+            if (hitZombie) {
+              const prevDamage = damageByZombieId.get(hitZombie.id) || 0;
+              damageByZombieId.set(hitZombie.id, prevDamage + proj.damage);
+              plannedDamage.set(
+                hitZombie.id,
+                (plannedDamage.get(hitZombie.id) || 0) + proj.damage,
+              );
+              // proiettile consumato, non sopravvive al tick
+            } else if (newX < 105) {
+              survivingProjectiles.push({ ...proj, x: newX });
+            }
+            // se newX >= 105 e non ha colpito nulla, il proiettile esce semplicemente di scena
+          }
+
+          if (damageByZombieId.size === 0) {
+            return currentZombies; // nessuna modifica, evitiamo un re-render inutile
+          }
+
+          return currentZombies.map((z) => {
+            const dmg = damageByZombieId.get(z.id);
+            if (!dmg) return z;
+            return { ...z, hp: z.hp - dmg };
+          });
+        });
+
+        return survivingProjectiles;
+      });
+    }, 30);
+
+    return () => clearInterval(projectileLoop);
   }, []);
 
   const handleSelectPlant = (key) => {
@@ -277,14 +412,80 @@ export default function App() {
     }
   };
 
+  const handleVsClick = () => {
+    if (plantTypes.ACORN) return;
+
+    const nextClicks = vsClicks + 1;
+    setVsClicks(nextClicks);
+
+    if (nextClicks === 3) {
+      setPlantTypes((prev) => ({
+        ...prev,
+        ACORN: {
+          name: "Acorn",
+          cost: 100,
+          image: "/img/acorn.png",
+          abilitycooldown: 0,
+          hp: 50,
+        },
+      }));
+      alert("Meme Attivato! Hai sbloccato l'Acorn! 🌳🐿️");
+    }
+  };
+
   const handleCellClick = (index) => {
-    if (!selectedPlant || grid[index] != null) return;
-    const plantData = PLANT_TYPES[selectedPlant];
+    if (!selectedPlant) return;
+    const plantData = plantTypes[selectedPlant];
 
-    if (sun >= plantData.cost) {
+    if (sun < plantData.cost) {
+      alert("Soli insufficienti!");
+      return;
+    }
+
+    const currentPlantInCell = grid[index];
+    const newGrid = [...grid];
+
+    if (selectedPlant === "ACORN") {
+      if (currentPlantInCell === null) {
+        setSun(sun - plantData.cost);
+        newGrid[index] = {
+          type: "ACORN",
+          image: plantData.image,
+          hp: 50,
+          maxHp: 50,
+          cooldownTimer: 0,
+          acornCount: 1,
+        };
+        setGrid(newGrid);
+        setSelectedPlant(null);
+      } else if (currentPlantInCell.type === "ACORN") {
+        const nextCount = currentPlantInCell.acornCount + 1;
+        setSun(sun - plantData.cost);
+
+        if (nextCount === 3) {
+          newGrid[index] = {
+            type: "OAK",
+            image: "/img/oak.png",
+            hp: 2000,
+            maxHp: 2000,
+            cooldownTimer: 0,
+            isGiant: true,
+          };
+        } else {
+          newGrid[index] = {
+            ...currentPlantInCell,
+            acornCount: nextCount,
+            hp: currentPlantInCell.hp + 50,
+            maxHp: currentPlantInCell.maxHp + 50,
+          };
+        }
+        setGrid(newGrid);
+        setSelectedPlant(null);
+      }
+    } else {
+      if (currentPlantInCell !== null) return;
+
       setSun(sun - plantData.cost);
-
-      const newGrid = [...grid];
       newGrid[index] = {
         type: selectedPlant,
         image: plantData.image,
@@ -292,33 +493,43 @@ export default function App() {
         maxHp: plantData.hp,
         cooldownTimer: 0,
       };
-
       setGrid(newGrid);
       setSelectedPlant(null);
-    } else {
-      alert("Soli insufficienti!");
     }
   };
 
   const handleCollectSun = (id, e) => {
-    e.stopPropagation(); // Previene il click sulla cella sottostante
+    e.stopPropagation();
     setSun((prev) => prev + 25);
     setDroppedSuns((prevSuns) => prevSuns.filter((s) => s.id !== id));
   };
 
   return (
     <div style={styles.container}>
-      {/* Iniezione dei Keyframes CSS per far pulsare i soli */}
       <style>
         {`
           @keyframes sunPulse {
             0% { transform: translate(-50%, -50%) scale(1); }
             100% { transform: translate(-50%, -50%) scale(1.2); }
           }
+          @keyframes oakPulse {
+            0% { transform: translate(-50%, -62%) scale(3); }
+            100% { transform: translate(-50%, -62%) scale(3.15); }
+          }
+          @keyframes peaSpin {
+            0% { transform: translateY(-50%) rotate(0deg); }
+            100% { transform: translateY(-50%) rotate(360deg); }
+          }
         `}
       </style>
 
-      <h1 style={styles.title}>Plants vs Zombies</h1>
+      <h1 style={styles.title}>
+        Plants{" "}
+        <span onClick={handleVsClick} style={styles.vsTrigger}>
+          vs
+        </span>{" "}
+        Zombies
+      </h1>
 
       <div style={styles.topBar}>
         <div style={styles.sunCounter}>
@@ -326,9 +537,9 @@ export default function App() {
         </div>
 
         <div style={styles.seedChooser}>
-          {Object.keys(PLANT_TYPES).map((key) => {
+          {Object.keys(plantTypes).map((key) => {
             const isSelected = selectedPlant === key;
-            const canAfford = sun >= PLANT_TYPES[key].cost;
+            const canAfford = sun >= plantTypes[key].cost;
 
             return (
               <button
@@ -345,8 +556,8 @@ export default function App() {
               >
                 <div style={styles.seedImageContainer}>
                   <img
-                    src={PLANT_TYPES[key].image}
-                    alt={PLANT_TYPES[key].name}
+                    src={plantTypes[key].image}
+                    alt={plantTypes[key].name}
                     style={styles.seedImage}
                     onError={(e) => {
                       e.target.style.visibility = "hidden";
@@ -354,8 +565,8 @@ export default function App() {
                   />
                 </div>
                 <div style={styles.btnTextContainer}>
-                  <span style={styles.plantName}>{PLANT_TYPES[key].name}</span>
-                  <span style={styles.costText}>{PLANT_TYPES[key].cost}</span>
+                  <span style={styles.plantName}>{plantTypes[key].name}</span>
+                  <span style={styles.costText}>{plantTypes[key].cost}</span>
                 </div>
               </button>
             );
@@ -384,6 +595,7 @@ export default function App() {
                 ...styles.cell,
                 backgroundColor: hoveredCell === index ? "#66bb6a" : "#4caf50",
                 position: "relative",
+                overflow: "visible",
               }}
             >
               {cell ? (
@@ -392,6 +604,10 @@ export default function App() {
                     display: "flex",
                     flexDirection: "column",
                     alignItems: "center",
+                    position: "relative",
+                    width: "100%",
+                    height: "100%",
+                    justifyContent: cell.isGiant ? "center" : "flex-end",
                   }}
                 >
                   <div
@@ -400,6 +616,9 @@ export default function App() {
                       height: "4px",
                       backgroundColor: "#000",
                       marginBottom: "2px",
+                      position: "absolute",
+                      top: cell.isGiant ? "-55px" : "4px",
+                      zIndex: 25,
                     }}
                   >
                     <div
@@ -410,14 +629,54 @@ export default function App() {
                       }}
                     />
                   </div>
-                  <img
-                    src={cell.image}
-                    alt={cell.type}
-                    style={styles.plantImage}
-                    onError={(e) => {
-                      e.target.style.visibility = "hidden";
-                    }}
-                  />
+
+                  {cell.type === "ACORN" ? (
+                    <div style={styles.acornStackContainer}>
+                      {Array.from({ length: cell.acornCount })
+                        .map((_, i) => i)
+                        .reverse()
+                        .map((renderIndex) => {
+                          return (
+                            <img
+                              key={renderIndex}
+                              src={cell.image}
+                              alt="Acorn"
+                              style={{
+                                ...styles.plantImage,
+                                position: "absolute",
+                                bottom: `${renderIndex * 18}px`,
+                                zIndex: 10 - renderIndex,
+                              }}
+                              onError={(e) => {
+                                e.target.style.visibility = "hidden";
+                              }}
+                            />
+                          );
+                        })}
+                    </div>
+                  ) : (
+                    <img
+                      src={cell.image}
+                      alt={cell.type}
+                      style={{
+                        ...styles.plantImage,
+                        position: cell.isGiant ? "absolute" : "relative",
+                        top: cell.isGiant ? "50%" : "auto",
+                        left: cell.isGiant ? "50%" : "auto",
+                        animation: cell.isGiant
+                          ? "oakPulse 1.5s infinite alternate ease-in-out"
+                          : "none",
+                        transform: cell.isGiant
+                          ? "translate(-50%, -62%) scale(3)"
+                          : "none",
+                        zIndex: cell.isGiant ? 20 : 2,
+                        transformOrigin: "center center",
+                      }}
+                      onError={(e) => {
+                        e.target.style.visibility = "hidden";
+                      }}
+                    />
+                  )}
                 </div>
               ) : (
                 selectedPlant &&
@@ -429,7 +688,7 @@ export default function App() {
           ))}
         </div>
 
-        {/* Render dei soli */}
+        {/* Render dei Soli */}
         {droppedSuns.map((sunItem) => (
           <div
             key={sunItem.id}
@@ -440,7 +699,48 @@ export default function App() {
               left: `${sunItem.left}px`,
             }}
           >
-            ☀️
+            <img
+              src="/img/sun.png"
+              alt="Sole"
+              style={{ width: "40px", height: "40px" }}
+            />
+          </div>
+        ))}
+
+        {/* Render dei Proiettili (Peas) del Peashooter */}
+        {projectiles.map((proj) => (
+          <div
+            key={proj.id}
+            style={{
+              position: "absolute",
+              top: `${proj.lane * 85 + 15 + 40}px`, // Centrato verticalmente nella corsia
+              left: `${proj.x}%`,
+              width: "40px",
+              height: "40px",
+              zIndex: 15,
+              animation: "peaSpin 0.5s linear infinite",
+              transition: "left 0.03s linear",
+            }}
+          >
+            <img
+              src="/img/pea.png"
+              alt="Pea"
+              style={{ width: "100%", height: "100%", objectFit: "contain" }}
+              onError={(e) => {
+                // Se manca l'immagine viene renderizzata una sfera verde stilizzata CSS
+                e.target.style.display = "none";
+                if (!e.target.parentNode.querySelector(".pea-fallback")) {
+                  const div = document.createElement("div");
+                  div.className = "pea-fallback";
+                  div.style.width = "16px";
+                  div.style.height = "16px";
+                  div.style.backgroundColor = "#4caf50";
+                  div.style.borderRadius = "50%";
+                  div.style.boxShadow = "0 0 6px #81c784";
+                  e.target.parentNode.appendChild(div);
+                }
+              }}
+            />
           </div>
         ))}
 
@@ -492,6 +792,7 @@ export default function App() {
   );
 }
 
+// Gli stili (const styles = { ... }) rimangono invariati rispetto al tuo codice originale
 const styles = {
   container: {
     padding: "20px",
@@ -503,7 +804,14 @@ const styles = {
     flexDirection: "column",
     alignItems: "center",
   },
-  title: { marginBottom: "20px", color: "#81c784" },
+  title: { marginBottom: "20px", color: "#81c784", userSelect: "none" },
+  vsTrigger: {
+    cursor: "pointer",
+    color: "#ffeb3b",
+    padding: "0 5px",
+    borderRadius: "4px",
+    transition: "background 0.2s",
+  },
   topBar: {
     display: "flex",
     flexDirection: "row",
@@ -603,7 +911,20 @@ const styles = {
     border: "1px solid #388e3c",
     borderRadius: "4px",
   },
-  plantImage: { maxWidth: "90%", maxHeight: "90%", objectFit: "contain" },
+  plantImage: {
+    maxWidth: "90%",
+    maxHeight: "90%",
+    objectFit: "contain",
+    transition: "transform 0.3s ease",
+  },
+  acornStackContainer: {
+    position: "relative",
+    width: "100%",
+    height: "100%",
+    display: "flex",
+    justifyContent: "center",
+    alignItems: "flex-end",
+  },
   zombieHpBarBg: {
     width: "45px",
     height: "6px",
@@ -618,7 +939,6 @@ const styles = {
     transition: "width 0.2s",
   },
   zombieImage: { width: "85px", height: "120px", objectFit: "contain" },
-
   droppedSun: {
     position: "absolute",
     fontSize: "36px",
