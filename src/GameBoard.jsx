@@ -1,4 +1,13 @@
-import React from "react";
+import React, { useState, useEffect } from "react";
+
+function useNow(interval = 100) {
+  const [now, setNow] = useState(Date.now());
+  useEffect(() => {
+    const t = setInterval(() => setNow(Date.now()), interval);
+    return () => clearInterval(t);
+  }, [interval]);
+  return now;
+}
 
 const styles = {
   cell: {
@@ -108,7 +117,9 @@ function PlantCell({ cell }) {
                   bottom: `${renderIndex * 18}px`,
                   zIndex: 10 - renderIndex,
                 }}
-                onError={(e) => { e.target.style.visibility = "hidden"; }}
+                onError={(e) => {
+                  e.target.style.visibility = "hidden";
+                }}
               />
             ))}
         </div>
@@ -128,10 +139,15 @@ function PlantCell({ cell }) {
               objectFit: "cover",
               objectPosition: "left",
               zIndex: 15,
-              animation: cell.cobState === "aiming" ? "cobAimPulse 0.6s infinite alternate" : "none",
+              animation:
+                cell.cobState === "aiming"
+                  ? "cobAimPulse 0.6s infinite alternate"
+                  : "none",
               cursor: cell.cobState === "ready" ? "pointer" : "default",
             }}
-            onError={(e) => { e.target.style.visibility = "hidden"; }}
+            onError={(e) => {
+              e.target.style.visibility = "hidden";
+            }}
           />
           {cell.cobState === "empty" && (
             <div
@@ -167,9 +183,14 @@ function PlantCell({ cell }) {
             objectFit: "cover",
             objectPosition: "right",
             zIndex: 14,
-            animation: cell.cobState === "aiming" ? "cobAimPulse 0.6s infinite alternate" : "none",
+            animation:
+              cell.cobState === "aiming"
+                ? "cobAimPulse 0.6s infinite alternate"
+                : "none",
           }}
-          onError={(e) => { e.target.style.visibility = "hidden"; }}
+          onError={(e) => {
+            e.target.style.visibility = "hidden";
+          }}
         />
       ) : (
         <img
@@ -185,13 +206,15 @@ function PlantCell({ cell }) {
                 ? "kingSquashJump 0.6s ease-in-out forwards"
                 : "squashJump 0.6s ease-in-out forwards"
               : cell.type === "KING_SQUASH"
-              ? "kingSquashPulse 1.2s infinite alternate ease-in-out"
-              : cell.type === "OAK"
-              ? "oakPulse 1.5s infinite alternate ease-in-out"
-              : "none",
+                ? "kingSquashPulse 1.2s infinite alternate ease-in-out"
+                : cell.type === "OAK"
+                  ? "oakPulse 1.5s infinite alternate ease-in-out"
+                  : "none",
             pointerEvents: cell.isGiant ? "none" : "auto",
           }}
-          onError={(e) => { e.target.style.visibility = "hidden"; }}
+          onError={(e) => {
+            e.target.style.visibility = "hidden";
+          }}
         />
       )}
     </div>
@@ -232,12 +255,14 @@ export default function GameBoard({
       >
         {grid.map((cell, index) => {
           const lane = Math.floor(index / 9);
-          const isAimingTarget = cobAiming !== null && lane === Math.floor(cobAiming / 9);
+          const isAimingTarget =
+            cobAiming !== null && lane === Math.floor(cobAiming / 9);
           const cellAnimStyle = cell?.isBeingPushed
             ? { animation: "goldPushGlow 0.6s ease-out" }
             : {};
           let cellBg = hoveredCell === index ? "#66bb6a" : "#4caf50";
-          if (isAimingTarget) cellBg = hoveredCell === index ? "#ffe066" : "#ffd633";
+          if (isAimingTarget)
+            cellBg = hoveredCell === index ? "#ffe066" : "#ffd633";
 
           return (
             <div
@@ -279,7 +304,11 @@ export default function GameBoard({
           }}
         >
           <img
-            src={exp.isCherry ? "/img/cherry_explosion.png" : "/img/mine_explosion.png"}
+            src={
+              exp.isCherry
+                ? "/img/cherry_explosion.png"
+                : "/img/mine_explosion.png"
+            }
             alt="Explosion"
             style={{ width: "100%", height: "100%", objectFit: "contain" }}
           />
@@ -303,7 +332,9 @@ export default function GameBoard({
             src={proj.image || "/img/pea.png"}
             alt="pea"
             style={styles.projectileImage}
-            onError={(e) => { e.target.style.visibility = "hidden"; }}
+            onError={(e) => {
+              e.target.style.visibility = "hidden";
+            }}
           />
         </div>
       ))}
@@ -332,7 +363,9 @@ export default function GameBoard({
                 src="/img/pannocchia2.png"
                 alt="explosion"
                 style={{ width: "100%", height: "100%", objectFit: "contain" }}
-                onError={(e) => { e.target.style.visibility = "hidden"; }}
+                onError={(e) => {
+                  e.target.style.visibility = "hidden";
+                }}
               />
             </div>
           );
@@ -344,8 +377,10 @@ export default function GameBoard({
         const startY = 15 + cob.originLane * 85 + 42;
         const endY = 15 + cob.lane * 85 + 42;
         const midY = Math.min(startY, endY) - 120;
-        const arcY = (1 - t) * (1 - t) * startY + 2 * (1 - t) * t * midY + t * t * endY;
-        const rotation = Math.atan2((endY - midY) * t, (endX - startX) / 9) * (180 / Math.PI);
+        const arcY =
+          (1 - t) * (1 - t) * startY + 2 * (1 - t) * t * midY + t * t * endY;
+        const rotation =
+          Math.atan2((endY - midY) * t, (endX - startX) / 9) * (180 / Math.PI);
         return (
           <div
             key={cob.id}
@@ -358,14 +393,17 @@ export default function GameBoard({
               transform: `translate(-50%, -50%) rotate(${rotation + 45}deg)`,
               zIndex: 40,
               pointerEvents: "none",
-              filter: "drop-shadow(0 0 8px rgba(255,220,100,0.8)) drop-shadow(2px 4px 8px rgba(0,0,0,0.5))",
+              filter:
+                "drop-shadow(0 0 8px rgba(255,220,100,0.8)) drop-shadow(2px 4px 8px rgba(0,0,0,0.5))",
             }}
           >
             <img
               src="/img/pannocchia.png"
               alt="cob"
               style={{ width: "100%", height: "100%", objectFit: "contain" }}
-              onError={(e) => { e.target.style.visibility = "hidden"; }}
+              onError={(e) => {
+                e.target.style.visibility = "hidden";
+              }}
             />
           </div>
         );
@@ -373,7 +411,8 @@ export default function GameBoard({
 
       {/* Lightning bolts */}
       {lightningBolts.map((bolt) => {
-        const dx = bolt.x2 - bolt.x1, dy = bolt.y2 - bolt.y1;
+        const dx = bolt.x2 - bolt.x1,
+          dy = bolt.y2 - bolt.y1;
         const length = Math.sqrt(dx * dx + dy * dy);
         const angle = (Math.atan2(dy, dx) * 180) / Math.PI;
         return (
@@ -424,9 +463,19 @@ export default function GameBoard({
             }}
           >
             <defs>
-              <filter id={`ringGlow-${wave.id}`} x="-50%" y="-50%" width="200%" height="200%">
+              <filter
+                id={`ringGlow-${wave.id}`}
+                x="-50%"
+                y="-50%"
+                width="200%"
+                height="200%"
+              >
                 <feGaussianBlur stdDeviation="5" result="blur" />
-                <feMerge><feMergeNode in="blur"/><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
+                <feMerge>
+                  <feMergeNode in="blur" />
+                  <feMergeNode in="blur" />
+                  <feMergeNode in="SourceGraphic" />
+                </feMerge>
               </filter>
             </defs>
             <path
@@ -436,7 +485,10 @@ export default function GameBoard({
               fill="none"
               strokeOpacity={opacities[ringIdx]}
               filter={`url(#ringGlow-${wave.id})`}
-              style={{ animation: "sonicRingExpand 1s ease-out forwards", transformOrigin: `${originX}px ${originY}px` }}
+              style={{
+                animation: "sonicRingExpand 1s ease-out forwards",
+                transformOrigin: `${originX}px ${originY}px`,
+              }}
             />
             <path
               d={`M ${originX} ${originY} Q ${originX + maxW * 0.45} ${originY + maxH * 0.5}, ${originX + maxW} ${originY + maxH}`}
@@ -445,7 +497,10 @@ export default function GameBoard({
               fill="none"
               strokeOpacity={opacities[ringIdx]}
               filter={`url(#ringGlow-${wave.id})`}
-              style={{ animation: "sonicRingExpand 1s ease-out forwards", transformOrigin: `${originX}px ${originY}px` }}
+              style={{
+                animation: "sonicRingExpand 1s ease-out forwards",
+                transformOrigin: `${originX}px ${originY}px`,
+              }}
             />
             <path
               d={`M ${originX + maxW} ${originY - maxH} Q ${originX + maxW * 1.08} ${originY}, ${originX + maxW} ${originY + maxH}`}
@@ -454,10 +509,18 @@ export default function GameBoard({
               fill="none"
               strokeOpacity={opacities[ringIdx] * 0.95}
               filter={`url(#ringGlow-${wave.id})`}
-              style={{ animation: "sonicRingExpand 1s ease-out forwards", transformOrigin: `${originX}px ${originY}px` }}
+              style={{
+                animation: "sonicRingExpand 1s ease-out forwards",
+                transformOrigin: `${originX}px ${originY}px`,
+              }}
             />
             {ringIdx === 0 && (
-              <circle cx={originX} cy={originY} r={10} fill="#FFFFFF" opacity={0.95}
+              <circle
+                cx={originX}
+                cy={originY}
+                r={10}
+                fill="#FFFFFF"
+                opacity={0.95}
                 filter={`url(#ringGlow-${wave.id})`}
                 style={{ animation: "sonicRingExpand 1s ease-out forwards" }}
               />
@@ -486,7 +549,8 @@ export default function GameBoard({
               height: `${CELL}px`,
               backgroundColor: "rgba(255, 215, 0, 0.35)",
               border: "2px solid #FFD700",
-              boxShadow: "inset 0 0 15px rgba(255,215,0,0.5), 0 0 8px rgba(255,215,0,0.4)",
+              boxShadow:
+                "inset 0 0 15px rgba(255,215,0,0.5), 0 0 8px rgba(255,215,0,0.4)",
               pointerEvents: "none",
               zIndex: 5,
               display: "flex",
@@ -553,7 +617,9 @@ export default function GameBoard({
                 ? "hue-rotate(180deg) saturate(1.8) brightness(1.2)"
                 : "none",
             }}
-            onError={(e) => { e.target.style.visibility = "hidden"; }}
+            onError={(e) => {
+              e.target.style.visibility = "hidden";
+            }}
           />
         </div>
       ))}

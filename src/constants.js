@@ -5,6 +5,7 @@ export const INITIAL_PLANT_TYPES = {
     image: "/img/sunflower.jpg",
     abilitycooldown: 7,
     hp: 150,
+    recharge_cd: 5,
   },
   PEASHOOTER: {
     name: "Peashooter",
@@ -13,6 +14,7 @@ export const INITIAL_PLANT_TYPES = {
     abilitycooldown: 1.5,
     hp: 200,
     damage: 20,
+    recharge_cd: 5,
   },
   WALNUT: {
     name: "Walnut",
@@ -20,6 +22,7 @@ export const INITIAL_PLANT_TYPES = {
     image: "/img/Nut.jpg",
     abilitycooldown: 0,
     hp: 700,
+    recharge_cd: 20,
   },
   POTATOMINE: {
     name: "Potato Mine",
@@ -27,6 +30,7 @@ export const INITIAL_PLANT_TYPES = {
     image: "/img/potato.jpg",
     abilitycooldown: 0,
     hp: 100,
+    recharge_cd: 30,
   },
   CABBAGEPULT: {
     name: "Cabbagepult",
@@ -34,6 +38,7 @@ export const INITIAL_PLANT_TYPES = {
     image: "/img/Cabbage.jpg",
     abilitycooldown: 2,
     hp: 300,
+    recharge_cd: 5,
   },
   TORCHWOOD: {
     name: "Torchwood",
@@ -41,6 +46,7 @@ export const INITIAL_PLANT_TYPES = {
     image: "/img/torch.jpg",
     abilitycooldown: 0,
     hp: 300,
+    recharge_cd: 20,
   },
   SQUASH: {
     name: "Squash",
@@ -48,14 +54,16 @@ export const INITIAL_PLANT_TYPES = {
     image: "/img/squash.jpg",
     abilitycooldown: 0,
     hp: 100000,
+    recharge_cd: 30,
   },
   LIGHTNINGREED: {
     name: "Lightning Reed",
     cost: 125,
     image: "/img/lightning.jpg",
-    abilitycooldown: 1.5,
+    abilitycooldown: 0,
     hp: 300,
     damage: 15,
+    recharge_cd: 10,
   },
   GATLINGPEA: {
     name: "Gatling Peashooter",
@@ -64,6 +72,7 @@ export const INITIAL_PLANT_TYPES = {
     abilitycooldown: 1.2,
     hp: 300,
     damage: 20,
+    recharge_cd: 45,
   },
   CHERRYBOMB: {
     name: "Cherry Bomb",
@@ -71,13 +80,15 @@ export const INITIAL_PLANT_TYPES = {
     image: "/img/cherrybomb.jpg",
     abilitycooldown: 0,
     hp: 100,
+    recharge_cd: 45,
   },
   FUMESHROOM: {
     name: "Fume Shroom",
     cost: 150,
     image: "/img/fumeshroom.jpg",
-    abilitycooldown: 1,
+    abilitycooldown: 2,
     hp: 300,
+    recharge_cd: 20,
   },
   CACTUS: {
     name: "Cactus",
@@ -85,6 +96,7 @@ export const INITIAL_PLANT_TYPES = {
     image: "/img/cactus.jpg",
     abilitycooldown: 1,
     hp: 300,
+    recharge_cd: 15,
   },
   CHOMPER: {
     name: "Chomper",
@@ -92,6 +104,7 @@ export const INITIAL_PLANT_TYPES = {
     image: "/img/chomper.jpg",
     abilitycooldown: 30,
     hp: 300,
+    recharge_cd: 30,
   },
   SNOWPEA: {
     name: "Snowpea",
@@ -100,6 +113,7 @@ export const INITIAL_PLANT_TYPES = {
     abilitycooldown: 1.5,
     hp: 200,
     damage: 20,
+    recharge_cd: 20,
   },
   COBCANNON: {
     name: "Cob Cannon",
@@ -107,6 +121,7 @@ export const INITIAL_PLANT_TYPES = {
     image: "/img/corn.jpg",
     abilitycooldown: 30,
     hp: 500,
+    recharge_cd: 45,
   },
 };
 

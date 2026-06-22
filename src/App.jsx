@@ -25,9 +25,10 @@ export default function App() {
   const [flyingCobs, setFlyingCobs] = useState([]);
   const [explosions, setExplosions] = useState([]);
   const [sonicWaves, setSonicWaves] = useState([]);
-  const [goldTiles, setGoldTiles] = useState([]); // {id, index, expiresAt}
+  const [goldTiles, setGoldTiles] = useState([]);
   const [blingYetiSpawned, setBlingYetiSpawned] = useState(false);
   const blingYetiSpawnedRef = useRef(false);
+  const [flashbang, setFlashbang] = useState(false);
 
   const plantTypesRef = useRef(plantTypes);
   const zombiesRef = useRef(zombies);
@@ -118,8 +119,10 @@ export default function App() {
       if (cutscene) return;
       const randomLane = Math.floor(Math.random() * 5);
       const keys = Object.keys(ZOMBIE_TYPES).filter(
-        (k) => k !== "QIN_SHI_HUANG" && k !== "BLING_YETI" &&
-               (k !== "YETI" || blingYetiSpawnedRef.current),
+        (k) =>
+          k !== "QIN_SHI_HUANG" &&
+          k !== "BLING_YETI" &&
+          (k !== "YETI" || blingYetiSpawnedRef.current),
       );
       const randomKey = keys[Math.floor(Math.random() * keys.length)];
       const zombieData = ZOMBIE_TYPES[randomKey];
@@ -136,6 +139,7 @@ export default function App() {
           image: zombieData.image,
           damage: zombieData.damage,
           isSlowed: false,
+          spawnedAt: Date.now(),
         },
       ]);
     }, 7000);
@@ -442,48 +446,60 @@ export default function App() {
           const lane = Math.floor(i / 9);
           const col = i % 9;
 
-          // Cooldown for continuous damage (every 500ms)
-          plant.oakDamageCooldown = (plant.oakDamageCooldown || 0) + 100;
-          // Cooldown for push (every 15s)
-          plant.oakPushCooldown = (plant.oakPushCooldown || 0) + 100;
+          // OAK cycle: 15s cooldown -> 30s attack -> 15s cooldown -> repeat
+          plant.oakCycleTimer = (plant.oakCycleTimer || 0) + 100;
+          if (plant.oakCycleTimer >= 60000) plant.oakCycleTimer = 0;
 
-          const doDamage = plant.oakDamageCooldown >= 500;
-          const doPush = plant.oakPushCooldown >= 15000;
+          const oakActive =
+            plant.oakCycleTimer >= 15000 && plant.oakCycleTimer < 45000;
+
+          plant.oakDamageCooldown = (plant.oakDamageCooldown || 0) + 100;
+          const doDamage = oakActive && plant.oakDamageCooldown >= 500;
 
           if (doDamage) {
             plant.oakDamageCooldown = 0;
             // Triangular area: range 4 cols, expanding width
             // col+1: width 1 (same lane), col+2: ±0.5, col+3: ±1, col+4: ±1
-            const oakDmg = 8;
+            const oakDmg = 100;
             setZombies((prevZombies) =>
-              prevZombies.map((z) => {
-                const zCol = (z.x / 100) * 9;
-                const dist = zCol - (col + 0.5);
-                if (dist <= 0) return z;
-                let maxLaneDiff = 0;
-                if (dist <= 1) maxLaneDiff = 0;
-                else if (dist <= 2) maxLaneDiff = 0.5;
-                else if (dist <= 4) maxLaneDiff = 1;
-                else return z;
-                if (Math.abs(z.lane - lane) <= maxLaneDiff) {
-                  return { ...z, hp: Math.max(0, z.hp - oakDmg) };
-                }
-                return z;
-              }).filter((z) => z.hp > 0)
+              prevZombies
+                .map((z) => {
+                  const zCol = (z.x / 100) * 9;
+                  const dist = zCol - (col + 0.5);
+                  if (dist <= 0) return z;
+                  let maxLaneDiff = 0;
+                  if (dist <= 1) maxLaneDiff = 0;
+                  else if (dist <= 2) maxLaneDiff = 0.5;
+                  else if (dist <= 4) maxLaneDiff = 1;
+                  else return z;
+                  if (Math.abs(z.lane - lane) <= maxLaneDiff) {
+                    return { ...z, hp: Math.max(0, z.hp - oakDmg) };
+                  }
+                  return z;
+                })
+                .filter((z) => z.hp > 0),
             );
             // Spawn visual wave (3 rings expanding outward)
             for (let ring = 0; ring < 3; ring++) {
               const waveId = `oakwave-${Date.now()}-${Math.random()}-${ring}`;
               const delay = ring * 120;
               setTimeout(() => {
-                setSonicWaves((prev) => [...prev, { id: waveId, lane, col, ring, createdAt: Date.now() }]);
-                setTimeout(() => setSonicWaves((prev) => prev.filter((w) => w.id !== waveId)), 1100);
+                setSonicWaves((prev) => [
+                  ...prev,
+                  { id: waveId, lane, col, ring, createdAt: Date.now() },
+                ]);
+                setTimeout(
+                  () =>
+                    setSonicWaves((prev) =>
+                      prev.filter((w) => w.id !== waveId),
+                    ),
+                  1100,
+                );
               }, delay);
             }
           }
 
-          if (doPush) {
-            plant.oakPushCooldown = 0;
+          if (oakActive) {
             setZombies((prevZombies) =>
               prevZombies.map((z) => {
                 const zCol = (z.x / 100) * 9;
@@ -494,11 +510,14 @@ export default function App() {
                 else if (dist <= 2) maxLaneDiff = 0.5;
                 else if (dist <= 4) maxLaneDiff = 1;
                 else return z;
-                if (Math.abs(z.lane - lane) <= maxLaneDiff && !ZOMBIE_TYPES[z.type]?.isBoss) {
-                  return { ...z, x: Math.min(100, z.x + (100 / 9)) };
+                if (
+                  Math.abs(z.lane - lane) <= maxLaneDiff &&
+                  !ZOMBIE_TYPES[z.type]?.isBoss
+                ) {
+                  return { ...z, x: Math.min(100, z.x + 0.12) };
                 }
                 return z;
-              })
+              }),
             );
           }
 
@@ -563,8 +582,11 @@ export default function App() {
                         }, 200);
                       }
                     } else {
-                      const isOnGold = goldTilesRef.current.some((t) => t.index === cellIndex);
-                      const damagePerTick = (updatedZombie.damage / 10) * (isOnGold ? 2 : 1);
+                      const isOnGold = goldTilesRef.current.some(
+                        (t) => t.index === cellIndex,
+                      );
+                      const damagePerTick =
+                        (updatedZombie.damage / 10) * (isOnGold ? 2 : 1);
                       const damagedPlant = { ...plant };
                       if (damagedPlant.hp - damagePerTick <= 0) {
                         if (
@@ -692,7 +714,17 @@ export default function App() {
                 }
                 return z;
               })
-              .filter((z) => z.hp > 0),
+              .filter((z) => {
+                if (z.hp <= 0) {
+                  const aliveMs = Date.now() - (z.spawnedAt || 0);
+                  if (aliveMs < 1000) {
+                    setFlashbang(true);
+                    setTimeout(() => setFlashbang(false), 2500);
+                  }
+                  return false;
+                }
+                return true;
+              }),
           );
         }
         return survivingProjectiles;
@@ -724,7 +756,9 @@ export default function App() {
             setGoldTiles((prev) => [...prev, ...newTiles]);
             chosen.forEach((idx) => {
               setTimeout(() => {
-                setGoldTiles((prev) => prev.filter((t) => !newTiles.find((nt) => nt.id === t.id)));
+                setGoldTiles((prev) =>
+                  prev.filter((t) => !newTiles.find((nt) => nt.id === t.id)),
+                );
               }, 20000);
             });
             changed = true;
@@ -1122,7 +1156,44 @@ export default function App() {
         @keyframes cobAimPulse { 0% { filter: drop-shadow(0 0 4px #ffcc00); } 100% { filter: drop-shadow(0 0 14px #ff6600); } }
         @keyframes cobExplode { 0% { transform: translate(-50%, -50%) scale(1); opacity: 1; } 100% { transform: translate(-50%, -50%) scale(2.5); opacity: 0; } }
         @keyframes bombExplode { 0% { transform: translate(-50%, -50%) scale(0.3); opacity: 1; } 100% { transform: translate(-50%, -50%) scale(2); opacity: 0; } }
+        @keyframes flashbangFade { 0% { opacity: 1; } 30% { opacity: 0.95; } 100% { opacity: 0; } }
       `}</style>
+
+      {/* Flashbang overlay */}
+      {flashbang && (
+        <div
+          style={{
+            position: "fixed",
+            top: 0,
+            left: 0,
+            width: "100vw",
+            height: "100vh",
+            backgroundColor: "white",
+            zIndex: 9999,
+            pointerEvents: "none",
+            animation: "flashbangFade 2.5s ease-out forwards",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+          }}
+        >
+          <img
+            src="/img/zombie_face.png"
+            alt="Zombie killed in under 1 second!"
+            style={{
+              width: "400px",
+              height: "400px",
+              objectFit: "contain",
+              opacity: 0.85,
+              filter: "drop-shadow(0 0 30px rgba(255,0,0,0.8))",
+              animation: "flashbangFade 2.5s ease-out forwards",
+            }}
+            onError={(e) => {
+              e.target.style.display = "none";
+            }}
+          />
+        </div>
+      )}
 
       {/* Cutscene overlay */}
       {cutscene && (
@@ -1146,21 +1217,34 @@ export default function App() {
               padding: "30px",
               borderRadius: "15px",
               textAlign: "center",
-              border: cutscene.type === "BLING_YETI" ? "4px solid #FFD700" : "4px solid gold",
+              border:
+                cutscene.type === "BLING_YETI"
+                  ? "4px solid #FFD700"
+                  : "4px solid gold",
               animation: "cutsceneFade 3.5s forwards",
-              background: cutscene.type === "BLING_YETI"
-                ? "linear-gradient(135deg, #1a1a1a 0%, #2d2200 100%)"
-                : "#222",
+              background:
+                cutscene.type === "BLING_YETI"
+                  ? "linear-gradient(135deg, #1a1a1a 0%, #2d2200 100%)"
+                  : "#222",
             }}
           >
             <img
-              src={cutscene.type === "BLING_YETI" ? "/img/bling.png" : "/img/qinshi.png"}
-              alt={cutscene.type === "BLING_YETI" ? "Bling Yeti" : "Qin Shi Huang"}
+              src={
+                cutscene.type === "BLING_YETI"
+                  ? "/img/bling.png"
+                  : "/img/qinshi.png"
+              }
+              alt={
+                cutscene.type === "BLING_YETI" ? "Bling Yeti" : "Qin Shi Huang"
+              }
               style={{
                 width: "150px",
                 height: "150px",
                 objectFit: "contain",
-                filter: cutscene.type === "BLING_YETI" ? "drop-shadow(0 0 12px gold)" : "none",
+                filter:
+                  cutscene.type === "BLING_YETI"
+                    ? "drop-shadow(0 0 12px gold)"
+                    : "none",
               }}
             />
             {cutscene.type === "BLING_YETI" && (
@@ -1176,8 +1260,8 @@ export default function App() {
               }}
             >
               {cutscene.type === "BLING_YETI"
-                ? "\"Aurghh, your gold is now mine!\""
-                : "\"A king never wavers, a king never bends, a king never relies on others, a king NEVER GIVES UP!\""}
+                ? '"Aurghh, your gold is now mine!"'
+                : '"A king never wavers, a king never bends, a king never relies on others, a king NEVER GIVES UP!"'}
             </p>
           </div>
         </div>
