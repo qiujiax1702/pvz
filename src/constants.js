@@ -70,7 +70,7 @@ export const INITIAL_PLANT_TYPES = {
     cost: 125,
     image: "/img/cherrybomb.jpg",
     abilitycooldown: 0,
-    hp: 1,
+    hp: 100,
   },
   FUMESHROOM: {
     name: "Fume Shroom",
