@@ -153,6 +153,14 @@ export const ZOMBIE_TYPES = {
     image: "/img/yeti.jpg",
     damage: 30,
   },
+  BLING_YETI: {
+    name: "Bling Yeti",
+    hp: 12000,
+    speed: 0.06,
+    image: "/img/bling.png",
+    damage: 35,
+    isBoss: true,
+  },
   QIN_SHI_HUANG: {
     name: "Qin Shi Huang",
     hp: 15000,

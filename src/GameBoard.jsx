@@ -205,6 +205,8 @@ export default function GameBoard({
   flyingCobs,
   lightningBolts,
   explosions,
+  sonicWaves,
+  goldTiles,
   droppedSuns,
   hoveredCell,
   cobAiming,
@@ -393,6 +395,109 @@ export default function GameBoard({
               pointerEvents: "none",
             }}
           />
+        );
+      })}
+
+      {/* Sonic Waves (Oak Tree) - concentric expanding rings */}
+      {(sonicWaves || []).map((wave) => {
+        const STEP = 87;
+        const PADDING = 5;
+        const originX = PADDING + wave.col * STEP + STEP;
+        const originY = PADDING + wave.lane * STEP + STEP / 2;
+        const ringIdx = wave.ring || 0;
+        const maxW = STEP * 5;
+        const maxH = STEP * 1.5;
+        const colors = ["#FFD700", "#FFFF00", "#FFF176"];
+        const strokeW = [6, 5, 4];
+        const opacities = [1.0, 0.9, 0.75];
+        return (
+          <svg
+            key={wave.id}
+            style={{
+              position: "absolute",
+              top: 0,
+              left: 0,
+              width: "810px",
+              height: "510px",
+              pointerEvents: "none",
+              zIndex: 20,
+            }}
+          >
+            <defs>
+              <filter id={`ringGlow-${wave.id}`} x="-50%" y="-50%" width="200%" height="200%">
+                <feGaussianBlur stdDeviation="5" result="blur" />
+                <feMerge><feMergeNode in="blur"/><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
+              </filter>
+            </defs>
+            <path
+              d={`M ${originX} ${originY} Q ${originX + maxW * 0.45} ${originY - maxH * 0.5}, ${originX + maxW} ${originY - maxH}`}
+              stroke={colors[ringIdx]}
+              strokeWidth={strokeW[ringIdx]}
+              fill="none"
+              strokeOpacity={opacities[ringIdx]}
+              filter={`url(#ringGlow-${wave.id})`}
+              style={{ animation: "sonicRingExpand 1s ease-out forwards", transformOrigin: `${originX}px ${originY}px` }}
+            />
+            <path
+              d={`M ${originX} ${originY} Q ${originX + maxW * 0.45} ${originY + maxH * 0.5}, ${originX + maxW} ${originY + maxH}`}
+              stroke={colors[ringIdx]}
+              strokeWidth={strokeW[ringIdx]}
+              fill="none"
+              strokeOpacity={opacities[ringIdx]}
+              filter={`url(#ringGlow-${wave.id})`}
+              style={{ animation: "sonicRingExpand 1s ease-out forwards", transformOrigin: `${originX}px ${originY}px` }}
+            />
+            <path
+              d={`M ${originX + maxW} ${originY - maxH} Q ${originX + maxW * 1.08} ${originY}, ${originX + maxW} ${originY + maxH}`}
+              stroke={ringIdx === 0 ? "#FFFFFF" : colors[ringIdx]}
+              strokeWidth={strokeW[ringIdx] - 1}
+              fill="none"
+              strokeOpacity={opacities[ringIdx] * 0.95}
+              filter={`url(#ringGlow-${wave.id})`}
+              style={{ animation: "sonicRingExpand 1s ease-out forwards", transformOrigin: `${originX}px ${originY}px` }}
+            />
+            {ringIdx === 0 && (
+              <circle cx={originX} cy={originY} r={10} fill="#FFFFFF" opacity={0.95}
+                filter={`url(#ringGlow-${wave.id})`}
+                style={{ animation: "sonicRingExpand 1s ease-out forwards" }}
+              />
+            )}
+          </svg>
+        );
+      })}
+
+      {/* Gold Tiles (Bling Yeti) */}
+      {(goldTiles || []).map((tile) => {
+        const CELL = 85;
+        const STEP = 87;
+        const PADDING = 5;
+        const tileCol = tile.index % 9;
+        const tileLane = Math.floor(tile.index / 9);
+        const left = PADDING + tileCol * STEP;
+        const top = PADDING + tileLane * STEP;
+        return (
+          <div
+            key={tile.id}
+            style={{
+              position: "absolute",
+              left: `${left}px`,
+              top: `${top}px`,
+              width: `${CELL}px`,
+              height: `${CELL}px`,
+              backgroundColor: "rgba(255, 215, 0, 0.35)",
+              border: "2px solid #FFD700",
+              boxShadow: "inset 0 0 15px rgba(255,215,0,0.5), 0 0 8px rgba(255,215,0,0.4)",
+              pointerEvents: "none",
+              zIndex: 5,
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              fontSize: "22px",
+              animation: "goldTilePulse 1s ease-in-out infinite alternate",
+            }}
+          >
+            💰
+          </div>
         );
       })}
 
